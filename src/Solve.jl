@@ -124,7 +124,7 @@ function evolveSynapse_noformat(xc0::Vector{T}, xd0, p_synapse::SynapseParams,
 	if isnothing(agg)
 		@info "last bit" length(res.time) tt[end] p_synapse.t_end
 	else
-		@info "last bit" length(res.t) tt[end] p_synapse.t_end
+		@info "last bit" length(res.xcsol.t) tt[end] p_synapse.t_end
 	end
 
 	# update the progress bar
@@ -144,15 +144,10 @@ function formatSimResult!(res::PDMP.PDMPResult, XC, XD, tt)
 	nothing
 end
 
-function formatSimResult!(res::ODESolution, XC, XD, tt)
-	if res.u isa ExtendedJumpArray
-		u = VectorOfArray([u.u for u in res.u]) 
-	else
-		u = VectorOfArray(res.u)
-	end
-	append!(XC, VectorOfArray([i[1:34] for i in u]))
-	append!(XD, VectorOfArray([i[35:84] for i in u]))
-	append!(tt, res.t)
+function formatSimResult!(res::NamedTuple, XC, XD, tt)
+	append!(XC, VectorOfArray(res.xcsol.u))
+        append!(XD, VectorOfArray(res.xdsol.saveval))
+	append!(tt, res.xcsol.t)
 	nothing
 end
 

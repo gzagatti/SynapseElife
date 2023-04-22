@@ -344,7 +344,7 @@ function R_synapse(rate, xc, xd, p_synapse::SynapseParams, t, sum_rate, glu = 0)
 	end
 end
 
-function SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, glu, p_synapse, nu, algo, agg = nothing; kwargs...)
+function SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, glu, p_synapse, nu, algo::T, agg = nothing; kwargs...) where {T <: CHV}
 	problem = PDMP.PDMPProblem(
 		(xdot, xc, xd, p, t) -> F_synapse(xdot, xc, xd, p, t, events_bap, bap_by_epsp),
 		(rate, xc, xd, p, t, sum_rate) -> R_synapse(rate, xc, xd, p, t, sum_rate, glu),

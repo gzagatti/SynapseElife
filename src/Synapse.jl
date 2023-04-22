@@ -10,6 +10,8 @@ module Synapse
 	using Plots
 	using LinearAlgebra, RecursiveArrayTools
 	using DifferentialEquations, LSODA, Sundials
+	using DiffEqCallbacks: SavedValues, SavingAffect
+	using DataStructures: BinaryMinHeap, BinaryMaxHeap
 	using JumpProcesses
 	using PiecewiseDeterministicMarkovProcesses
 	const PDMP = PiecewiseDeterministicMarkovProcesses
