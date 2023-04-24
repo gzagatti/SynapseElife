@@ -1,5 +1,6 @@
 # using Revise, Plots
 using Test
+using Profile, ProfileSVG
 using Synapse
 using PiecewiseDeterministicMarkovProcesses, JumpProcesses, OrdinaryDiffEq, Sundials, LSODA, DiffEqCallbacks
 const PDMP = PiecewiseDeterministicMarkovProcesses
@@ -57,13 +58,33 @@ coresult = @time evolveSynapse(
 	save_positions = jsave_positions,
 );
 
+Profile.init(delay=1e-9)
+Profile.clear()
+coresult = @profile evolveSynapse(
+	xc0,
+	xd0,
+	p_synapse,
+	events_sorted_times,    # external events
+	is_pre_or_post_event,   # pre or post?
+	bap_by_epsp,
+	[true],
+	nu,
+	jalgos,
+	coagg;
+	save_positions = jsave_positions,
+);
+ProfileSVG.save("./coevolve-synced-profile.svg", 
+	title="evolveSynpase CoevolveSynced", maxdepth=110)
+Profile.clear()
+
+
 # Direct
 
-diagg = Direct();
+# diagg = Direct();
 
-diprob = JumpProblem(oprob, diagg, jumps; dep_graph = dep_graph, save_positions = jsave_positions, callback=cb);
-disol = (xcsol = solve(diprob, jalgos[1]), xdsol = xdsol);
-disol = @time (xcsol = solve(diprob, jalgos[1]), xdsol = xdsol);
+# diprob = JumpProblem(oprob, diagg, jumps; dep_graph = dep_graph, save_positions = jsave_positions, callback=cb);
+# disol = (xcsol = solve(diprob, jalgos[1]), xdsol = xdsol);
+# disol = @time (xcsol = solve(diprob, jalgos[1]), xdsol = xdsol);
 
 # unstable
 # diresult = @time evolveSynapse(
@@ -82,49 +103,49 @@ disol = @time (xcsol = solve(diprob, jalgos[1]), xdsol = xdsol);
 
 ##### PDMP problem
 
-pdmpsave_positions = (false, true);
+# pdmpsave_positions = (false, true);
 
-pdmpagg = nothing;
+# pdmpagg = nothing;
 
-# pdmpalgos = (CHV(:lsoda), CHV(:lsoda));
-# pdmpalgos = (CHV(CVODE_BDF()), CHV(CVODE_BDF()));
-pdmpalgos = (CHV(AutoTsit5(Rosenbrock23())), CHV(AutoTsit5(Rosenbrock23())));
+# # pdmpalgos = (CHV(:lsoda), CHV(:lsoda));
+# # pdmpalgos = (CHV(CVODE_BDF()), CHV(CVODE_BDF()));
+# pdmpalgos = (CHV(AutoTsit5(Rosenbrock23())), CHV(AutoTsit5(Rosenbrock23())));
 
-pdmpprob = PDMP.PDMPProblem(
-	(xdot, xc, xd, p, t) -> F_synapse(xdot, xc, xd, p, t, events_bap, bap_by_epsp),
-	(rate, xc, xd, p, t, sum_rate) -> R_synapse(rate, xc, xd, p, t, sum_rate, glu),
-	nu, xc0, xd0, p_synapse, (t1, t2);
-	Ncache = 12) # this option is for AD in PreallocationTools
-pdmpsol = solve(pdmpprob, pdmpalgos[1]);
-pdmpsol = @time solve(pdmpprob, pdmpalgos[1]);
+# pdmpprob = PDMP.PDMPProblem(
+# 	(xdot, xc, xd, p, t) -> F_synapse(xdot, xc, xd, p, t, events_bap, bap_by_epsp),
+# 	(rate, xc, xd, p, t, sum_rate) -> R_synapse(rate, xc, xd, p, t, sum_rate, glu),
+# 	nu, xc0, xd0, p_synapse, (t1, t2);
+# 	Ncache = 12) # this option is for AD in PreallocationTools
+# pdmpsol = solve(pdmpprob, pdmpalgos[1]);
+# pdmpsol = @time solve(pdmpprob, pdmpalgos[1]);
 
-pdmpresult = @time evolveSynapse(
-	xc0,
-	xd0,
-	p_synapse,
-	events_sorted_times,    # external events
-	is_pre_or_post_event,   # pre or post?
-	bap_by_epsp,
-	[true],
-	nu,
-	pdmpalgos,
-	pdmpagg;
-	save_positions = pdmpsave_positions,
-);
+# pdmpresult = @time evolveSynapse(
+# 	xc0,
+# 	xd0,
+# 	p_synapse,
+# 	events_sorted_times,    # external events
+# 	is_pre_or_post_event,   # pre or post?
+# 	bap_by_epsp,
+# 	[true],
+# 	nu,
+# 	pdmpalgos,
+# 	pdmpagg;
+# 	save_positions = pdmpsave_positions,
+# );
 
-@test ~isnothing(result);
+# @test ~isnothing(result);
 
 ##### Plots
 using Plots
 
 plot(coresult.t, coresult.XD[1, :], label="CoevolveSynced");
 # plot!(diresult.t, diresult.XD[1, :], label="Direct")
-plot!(pdmpresult.t, pdmpresult.XD[1, :], label="PDMP");
+# plot!(pdmpresult.t, pdmpresult.XD[1, :], label="PDMP");
 title!("N_ampa")
 
 plot(coresult.t, coresult.XC[1, :], label="CoevolveSynced");
 # plot!(diresult.t, diresult.XC[1, :], label="Direct")
-plot!(pdmpresult.t, pdmpresult.XC[1, :], label="PDMP");
+# plot!(pdmpresult.t, pdmpresult.XC[1, :], label="PDMP");
 title!("Vsp")
 
 # # plot the discrete variables
