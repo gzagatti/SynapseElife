@@ -207,13 +207,9 @@ function G_synapse(du, u, xd, p_synapse::SynapseParams, t, events_bap, bap_by_ep
 
 end
 
-macro model_jump(i, p_synapse, nu, Glu, rate_ex, urate_ex = nothing, rateinterval_ex = nothing)
+macro model_jump(i, p_synapse, nu, rate_ex, urate_ex = nothing, rateinterval_ex = nothing)
 
 	assignments = Expr[]
-
-	if occursin("Glu", "$rate_ex")
-		push!(assignments, :(Glu = $(esc(Glu))))
-	end
 
 	alpha_beta_regex = r"(alpha|beta)_(m_r|h_r|m_t|h_t|l|1_l|2_l)"
 	alpha_beta_matches = Set([m.match for m in eachmatch(alpha_beta_regex, "$rate_ex")])
@@ -266,9 +262,8 @@ macro model_jump(i, p_synapse, nu, Glu, rate_ex, urate_ex = nothing, rateinterva
 			$(assignments...)
 			return $rate_ex
 		end
-		js, as = findnz($(esc(nu))[$(esc(i)), :])
 		@inline @inbounds function affect!(integrator)
-			for (j, a) in zip(js, as)
+			for (j, a) in zip(findnz($(esc(nu))[$(esc(i)), :])...)
 				integrator.p.xd[j] += a
 			end
 		end
@@ -301,14 +296,7 @@ macro model_jump(i, p_synapse, nu, Glu, rate_ex, urate_ex = nothing, rateinterva
 
 end
 
-function J_synapse(p_synapse::SynapseParams, nu, glu, xd0)
-
-	@unpack_SynapseParams p_synapse
-
-	############### Glutamate & GABA ###################
-	Glu = glu_amp * glu
-
-	p = (xd0 = copy(xd0), xd = copy(xd0), p_synapse = p_synapse)
+function J_synapse(p_synapse::SynapseParams, nu)
 
 	# we order the jumps in ther order they appear in the dependency graph
 	jumps = JumpSet(;
@@ -316,146 +304,146 @@ function J_synapse(p_synapse::SynapseParams, nu, glu, xd0)
 		constant_jumps = [
 			############### AMPA ###################
 			#2line-GO
-			@model_jump(1,  p_synapse, nu, Glu, 4 * AMPA_k1 * Glu * p.xd[1]), # 1
-			@model_jump(2,  p_synapse, nu, Glu, 3 * AMPA_k1 * Glu * p.xd[2]), # 2
-			@model_jump(3,  p_synapse, nu, Glu, 2 * AMPA_k1 * Glu * p.xd[3]), # 3
-			@model_jump(4,  p_synapse, nu, Glu, 1 * AMPA_k1 * Glu * p.xd[4]), # 4
+			@model_jump(1,  p_synapse, nu, 4 * AMPA_k1 * p.Glu * p.xd[1]), # 1
+			@model_jump(2,  p_synapse, nu, 3 * AMPA_k1 * p.Glu * p.xd[2]), # 2
+			@model_jump(3,  p_synapse, nu, 2 * AMPA_k1 * p.Glu * p.xd[3]), # 3
+			@model_jump(4,  p_synapse, nu, 1 * AMPA_k1 * p.Glu * p.xd[4]), # 4
 			#2line-BACK
-			@model_jump(5,  p_synapse, nu, Glu, 4 * AMPA_k_1 * p.xd[5]), # 5
-			@model_jump(6,  p_synapse, nu, Glu, 3 * AMPA_k_1 * p.xd[4]), # 6
-			@model_jump(7,  p_synapse, nu, Glu, 2 * AMPA_k_1 * p.xd[3]), # 7
-			@model_jump(8,  p_synapse, nu, Glu, 1 * AMPA_k_1 * p.xd[2]), # 8
+			@model_jump(5,  p_synapse, nu, 4 * AMPA_k_1 * p.xd[5]), # 5
+			@model_jump(6,  p_synapse, nu, 3 * AMPA_k_1 * p.xd[4]), # 6
+			@model_jump(7,  p_synapse, nu, 2 * AMPA_k_1 * p.xd[3]), # 7
+			@model_jump(8,  p_synapse, nu, 1 * AMPA_k_1 * p.xd[2]), # 8
 			#3line-GO
-			@model_jump(9,  p_synapse, nu, Glu, 3 * AMPA_k1 * Glu * p.xd[6]), # 9
-			@model_jump(10, p_synapse, nu, Glu, 3 * AMPA_k1 * Glu * p.xd[7]), # 10
-			@model_jump(11, p_synapse, nu, Glu, 2 * AMPA_k1 * Glu * p.xd[8]), # 11
-			@model_jump(12, p_synapse, nu, Glu, 1 * AMPA_k1 * Glu * p.xd[9]), # 12
+			@model_jump(9,  p_synapse, nu, 3 * AMPA_k1 * p.Glu * p.xd[6]), # 9
+			@model_jump(10, p_synapse, nu, 3 * AMPA_k1 * p.Glu * p.xd[7]), # 10
+			@model_jump(11, p_synapse, nu, 2 * AMPA_k1 * p.Glu * p.xd[8]), # 11
+			@model_jump(12, p_synapse, nu, 1 * AMPA_k1 * p.Glu * p.xd[9]), # 12
 			#3line-BACK
-			@model_jump(13, p_synapse, nu, Glu, 3 * AMPA_k_1 * p.xd[10]), # 13
-			@model_jump(14, p_synapse, nu, Glu, 2 * AMPA_k_1 * p.xd[9]), # 14
-			@model_jump(15, p_synapse, nu, Glu, 1 * AMPA_k_1 * p.xd[8]), # 15
-			@model_jump(16, p_synapse, nu, Glu, 1 * AMPA_k_2 * p.xd[7]), # 16
+			@model_jump(13, p_synapse, nu, 3 * AMPA_k_1 * p.xd[10]), # 13
+			@model_jump(14, p_synapse, nu, 2 * AMPA_k_1 * p.xd[9]), # 14
+			@model_jump(15, p_synapse, nu, 1 * AMPA_k_1 * p.xd[8]), # 15
+			@model_jump(16, p_synapse, nu, 1 * AMPA_k_2 * p.xd[7]), # 16
 			#4line-GO
-			@model_jump(17, p_synapse, nu, Glu, 2 * AMPA_k1 * Glu * p.xd[11]), # 17
-			@model_jump(18, p_synapse, nu, Glu, 1 * AMPA_k1 * Glu * p.xd[12]), # 18
+			@model_jump(17, p_synapse, nu, 2 * AMPA_k1 * p.Glu * p.xd[11]), # 17
+			@model_jump(18, p_synapse, nu, 1 * AMPA_k1 * p.Glu * p.xd[12]), # 18
 			#4line-BACK
-			@model_jump(19, p_synapse, nu, Glu, 2 * AMPA_k_1 * p.xd[13]), # 19
-			@model_jump(20, p_synapse, nu, Glu, 1 * AMPA_k_1 * p.xd[12]), # 20
+			@model_jump(19, p_synapse, nu, 2 * AMPA_k_1 * p.xd[13]), # 19
+			@model_jump(20, p_synapse, nu, 1 * AMPA_k_1 * p.xd[12]), # 20
 			#1column-GO-BACK
-			@model_jump(21, p_synapse, nu, Glu, 4 * AMPA_delta_0 * p.xd[1]), # 21
-			@model_jump(22, p_synapse, nu, Glu, 1 * AMPA_gamma_0 * p.xd[6]), # 22
+			@model_jump(21, p_synapse, nu, 4 * AMPA_delta_0 * p.xd[1]), # 21
+			@model_jump(22, p_synapse, nu, 1 * AMPA_gamma_0 * p.xd[6]), # 22
 			#2column-GO-BACK
-			@model_jump(23, p_synapse, nu, Glu, 1 * AMPA_delta_1 * p.xd[2]), # 23
-			@model_jump(24, p_synapse, nu, Glu, 1 * AMPA_gamma_1 * p.xd[7]), # 24
+			@model_jump(23, p_synapse, nu, 1 * AMPA_delta_1 * p.xd[2]), # 23
+			@model_jump(24, p_synapse, nu, 1 * AMPA_gamma_1 * p.xd[7]), # 24
 			#3column-GO
-			@model_jump(25, p_synapse, nu, Glu, 1 * AMPA_alpha * p.xd[14]), # 25
-			@model_jump(26, p_synapse, nu, Glu, 2 * AMPA_delta_1 * p.xd[3]), # 26
-			@model_jump(27, p_synapse, nu, Glu, 1 * AMPA_delta_2 * p.xd[8]), # 27
+			@model_jump(25, p_synapse, nu, 1 * AMPA_alpha * p.xd[14]), # 25
+			@model_jump(26, p_synapse, nu, 2 * AMPA_delta_1 * p.xd[3]), # 26
+			@model_jump(27, p_synapse, nu, 1 * AMPA_delta_2 * p.xd[8]), # 27
 			#3column-BACK
-			@model_jump(28, p_synapse, nu, Glu, 1 * AMPA_gamma_2 * p.xd[11]), # 28
-			@model_jump(29, p_synapse, nu, Glu, 1 * AMPA_gamma_1 * p.xd[8]), # 29
-			@model_jump(30, p_synapse, nu, Glu, 2 * AMPA_beta * p.xd[3]), # 30
+			@model_jump(28, p_synapse, nu, 1 * AMPA_gamma_2 * p.xd[11]), # 28
+			@model_jump(29, p_synapse, nu, 1 * AMPA_gamma_1 * p.xd[8]), # 29
+			@model_jump(30, p_synapse, nu, 2 * AMPA_beta * p.xd[3]), # 30
 			#4column-GO
-			@model_jump(31, p_synapse, nu, Glu, 1 * AMPA_alpha * p.xd[15]), # 31
-			@model_jump(32, p_synapse, nu, Glu, 3 * AMPA_delta_1 * p.xd[4]), # 32
-			@model_jump(33, p_synapse, nu, Glu, 2 * AMPA_delta_2 * p.xd[9]), # 33
+			@model_jump(31, p_synapse, nu, 1 * AMPA_alpha * p.xd[15]), # 31
+			@model_jump(32, p_synapse, nu, 3 * AMPA_delta_1 * p.xd[4]), # 32
+			@model_jump(33, p_synapse, nu, 2 * AMPA_delta_2 * p.xd[9]), # 33
 			#4column-BACK
-			@model_jump(34, p_synapse, nu, Glu, 1 * AMPA_gamma_2 * p.xd[12]), # 34
-			@model_jump(35, p_synapse, nu, Glu, 1 * AMPA_gamma_1 * p.xd[9]), # 35
-			@model_jump(36, p_synapse, nu, Glu, 2 * AMPA_beta * p.xd[4]), # 36
+			@model_jump(34, p_synapse, nu, 1 * AMPA_gamma_2 * p.xd[12]), # 34
+			@model_jump(35, p_synapse, nu, 1 * AMPA_gamma_1 * p.xd[9]), # 35
+			@model_jump(36, p_synapse, nu, 2 * AMPA_beta * p.xd[4]), # 36
 			#5column-GO
-			@model_jump(37, p_synapse, nu, Glu, 1 * AMPA_alpha * p.xd[16]), # 37
-			@model_jump(38, p_synapse, nu, Glu, 4 * AMPA_delta_1 * p.xd[5]), # 38
-			@model_jump(39, p_synapse, nu, Glu, 3 * AMPA_delta_2 * p.xd[10]), # 39
+			@model_jump(37, p_synapse, nu, 1 * AMPA_alpha * p.xd[16]), # 37
+			@model_jump(38, p_synapse, nu, 4 * AMPA_delta_1 * p.xd[5]), # 38
+			@model_jump(39, p_synapse, nu, 3 * AMPA_delta_2 * p.xd[10]), # 39
 			#5column-BACK
-			@model_jump(40, p_synapse, nu, Glu, 1 * AMPA_gamma_2 * p.xd[13]), # 40
-			@model_jump(41, p_synapse, nu, Glu, 1 * AMPA_gamma_1 * p.xd[10]), # 41
-			@model_jump(42, p_synapse, nu, Glu, 4 * AMPA_beta * p.xd[5]), # 42
+			@model_jump(40, p_synapse, nu, 1 * AMPA_gamma_2 * p.xd[13]), # 40
+			@model_jump(41, p_synapse, nu, 1 * AMPA_gamma_1 * p.xd[10]), # 41
+			@model_jump(42, p_synapse, nu, 4 * AMPA_beta * p.xd[5]), # 42
 
 			############### NMDA ###################
 			#1line-GO
-			@model_jump(43, p_synapse, nu, Glu, NMDA_N2A_ka * p.xd[17] * Glu), # 43
-			@model_jump(44, p_synapse, nu, Glu, NMDA_N2A_kb * p.xd[18] * Glu), # 44
-			@model_jump(45, p_synapse, nu, Glu, NMDA_N2A_kc * p.xd[19]), # 45
-			@model_jump(46, p_synapse, nu, Glu, NMDA_N2A_kd * p.xd[20]), # 46
-			@model_jump(47, p_synapse, nu, Glu, NMDA_N2A_ke * p.xd[21]), # 47
-			@model_jump(48, p_synapse, nu, Glu, NMDA_N2A_kf * p.xd[22]), # 48
+			@model_jump(43, p_synapse, nu, NMDA_N2A_ka * p.xd[17] * p.Glu), # 43
+			@model_jump(44, p_synapse, nu, NMDA_N2A_kb * p.xd[18] * p.Glu), # 44
+			@model_jump(45, p_synapse, nu, NMDA_N2A_kc * p.xd[19]), # 45
+			@model_jump(46, p_synapse, nu, NMDA_N2A_kd * p.xd[20]), # 46
+			@model_jump(47, p_synapse, nu, NMDA_N2A_ke * p.xd[21]), # 47
+			@model_jump(48, p_synapse, nu, NMDA_N2A_kf * p.xd[22]), # 48
 			#1line-BACK
-			@model_jump(49, p_synapse, nu, Glu, NMDA_N2A_k_f * p.xd[23]), # 49
-			@model_jump(50, p_synapse, nu, Glu, NMDA_N2A_k_e * p.xd[22]), # 50
-			@model_jump(51, p_synapse, nu, Glu, NMDA_N2A_k_d * p.xd[21]), # 51
-			@model_jump(52, p_synapse, nu, Glu, NMDA_N2A_k_c * p.xd[20]), # 52
-			@model_jump(53, p_synapse, nu, Glu, NMDA_N2A_k_b * p.xd[19]), # 53
-			@model_jump(54, p_synapse, nu, Glu, NMDA_N2A_k_a * p.xd[18]), # 54
+			@model_jump(49, p_synapse, nu, NMDA_N2A_k_f * p.xd[23]), # 49
+			@model_jump(50, p_synapse, nu, NMDA_N2A_k_e * p.xd[22]), # 50
+			@model_jump(51, p_synapse, nu, NMDA_N2A_k_d * p.xd[21]), # 51
+			@model_jump(52, p_synapse, nu, NMDA_N2A_k_c * p.xd[20]), # 52
+			@model_jump(53, p_synapse, nu, NMDA_N2A_k_b * p.xd[19]), # 53
+			@model_jump(54, p_synapse, nu, NMDA_N2A_k_a * p.xd[18]), # 54
 
 			############### NMDA GLUN2B ###################
 			#1line-GO
-			@model_jump(80, p_synapse, nu, Glu, NMDA_N2B_sa * p.xd[39] * Glu), # 80
-			@model_jump(81, p_synapse, nu, Glu, NMDA_N2B_sb * p.xd[40] * Glu), # 81
-			@model_jump(82, p_synapse, nu, Glu, NMDA_N2B_sc * p.xd[41]), # 82
-			@model_jump(83, p_synapse, nu, Glu, NMDA_N2B_sd * p.xd[42]), # 83
-			@model_jump(84, p_synapse, nu, Glu, NMDA_N2B_se * p.xd[43]), # 84
-			@model_jump(85, p_synapse, nu, Glu, NMDA_N2B_sf * p.xd[44]), # 85
+			@model_jump(80, p_synapse, nu, NMDA_N2B_sa * p.xd[39] * p.Glu), # 80
+			@model_jump(81, p_synapse, nu, NMDA_N2B_sb * p.xd[40] * p.Glu), # 81
+			@model_jump(82, p_synapse, nu, NMDA_N2B_sc * p.xd[41]), # 82
+			@model_jump(83, p_synapse, nu, NMDA_N2B_sd * p.xd[42]), # 83
+			@model_jump(84, p_synapse, nu, NMDA_N2B_se * p.xd[43]), # 84
+			@model_jump(85, p_synapse, nu, NMDA_N2B_sf * p.xd[44]), # 85
 
 			#1line-BACK
-			@model_jump(86, p_synapse, nu, Glu, NMDA_N2B_s_f * p.xd[45]), # 86
-			@model_jump(87, p_synapse, nu, Glu, NMDA_N2B_s_e * p.xd[44]), # 87
-			@model_jump(88, p_synapse, nu, Glu, NMDA_N2B_s_d * p.xd[43]), # 88
-			@model_jump(89, p_synapse, nu, Glu, NMDA_N2B_s_c * p.xd[42]), # 89
-			@model_jump(90, p_synapse, nu, Glu, NMDA_N2B_s_b * p.xd[41]), # 90
-			@model_jump(91, p_synapse, nu, Glu, NMDA_N2B_s_a * p.xd[40]), # 91
+			@model_jump(86, p_synapse, nu, NMDA_N2B_s_f * p.xd[45]), # 86
+			@model_jump(87, p_synapse, nu, NMDA_N2B_s_e * p.xd[44]), # 87
+			@model_jump(88, p_synapse, nu, NMDA_N2B_s_d * p.xd[43]), # 88
+			@model_jump(89, p_synapse, nu, NMDA_N2B_s_c * p.xd[42]), # 89
+			@model_jump(90, p_synapse, nu, NMDA_N2B_s_b * p.xd[41]), # 90
+			@model_jump(91, p_synapse, nu, NMDA_N2B_s_a * p.xd[40]), # 91
 
 			############### GABA ###################
-			@model_jump(92, p_synapse, nu, Glu, GABA_r_b1  * p.xd[46] * Glu), # 92 to simplify, we use the same ammount at the same time)
-			@model_jump(93, p_synapse, nu, Glu, GABA_r_u1  * p.xd[47]), # 93
-			@model_jump(94, p_synapse, nu, Glu, GABA_r_b2  * p.xd[47] * Glu), # 94
-			@model_jump(95, p_synapse, nu, Glu, GABA_r_u2  * p.xd[48]), # 95
-			@model_jump(96, p_synapse, nu, Glu, GABA_r_ro1 * p.xd[47]), # 96
-			@model_jump(97, p_synapse, nu, Glu, GABA_r_c1  * p.xd[49]), # 97
-			@model_jump(98, p_synapse, nu, Glu, GABA_r_ro2 * p.xd[48]), # 98
-			@model_jump(99, p_synapse, nu, Glu, GABA_r_c2  * p.xd[50]), # 99
+			@model_jump(92, p_synapse, nu, GABA_r_b1  * p.xd[46] * p.Glu), # 92 to simplify, we use the same ammount at the same time)
+			@model_jump(93, p_synapse, nu, GABA_r_u1  * p.xd[47]), # 93
+			@model_jump(94, p_synapse, nu, GABA_r_b2  * p.xd[47] * p.Glu), # 94
+			@model_jump(95, p_synapse, nu, GABA_r_u2  * p.xd[48]), # 95
+			@model_jump(96, p_synapse, nu, GABA_r_ro1 * p.xd[47]), # 96
+			@model_jump(97, p_synapse, nu, GABA_r_c1  * p.xd[49]), # 97
+			@model_jump(98, p_synapse, nu, GABA_r_ro2 * p.xd[48]), # 98
+			@model_jump(99, p_synapse, nu, GABA_r_c2  * p.xd[50]), # 99
 
 		],
 
 		variable_jumps = [
 			################### R-type VGCC ###################
-			@model_jump(56, p_synapse, nu, Glu, p.xd[25] * alpha_m_r * frwd_VGCC, p.xd[25] * max_m_r * frwd_VGCC, typemax(Float64)), # 56
-			@model_jump(57, p_synapse, nu, Glu, p.xd[26] * beta_m_r  * bcwd_VGCC, p.xd[26] * max_m_r * frwd_VGCC, typemax(Float64)), # 57
-			@model_jump(58, p_synapse, nu, Glu, p.xd[25] * alpha_h_r * frwd_VGCC, p.xd[25] * max_h_r * frwd_VGCC, typemax(Float64)), # 58
-			@model_jump(59, p_synapse, nu, Glu, p.xd[27] * beta_h_r  * bcwd_VGCC, p.xd[27] * max_h_r * bcwd_VGCC, typemax(Float64)), # 59
-			@model_jump(60, p_synapse, nu, Glu, p.xd[26] * alpha_h_r * frwd_VGCC, p.xd[26] * max_h_r * frwd_VGCC, typemax(Float64)), # 60
-			@model_jump(61, p_synapse, nu, Glu, p.xd[28] * beta_h_r  * bcwd_VGCC, p.xd[28] * max_h_r * bcwd_VGCC, typemax(Float64)), # 61
-			@model_jump(62, p_synapse, nu, Glu, p.xd[27] * alpha_m_r * frwd_VGCC, p.xd[27] * max_m_r * frwd_VGCC, typemax(Float64)), # 62
-			@model_jump(63, p_synapse, nu, Glu, p.xd[28] * beta_m_r  * bcwd_VGCC, p.xd[28] * max_m_r * bcwd_VGCC, typemax(Float64)), # 63
+			@model_jump(56, p_synapse, nu, p.xd[25] * alpha_m_r * frwd_VGCC, p.xd[25] * max_m_r * frwd_VGCC, typemax(Float64)), # 56
+			@model_jump(57, p_synapse, nu, p.xd[26] * beta_m_r  * bcwd_VGCC, p.xd[26] * max_m_r * frwd_VGCC, typemax(Float64)), # 57
+			@model_jump(58, p_synapse, nu, p.xd[25] * alpha_h_r * frwd_VGCC, p.xd[25] * max_h_r * frwd_VGCC, typemax(Float64)), # 58
+			@model_jump(59, p_synapse, nu, p.xd[27] * beta_h_r  * bcwd_VGCC, p.xd[27] * max_h_r * bcwd_VGCC, typemax(Float64)), # 59
+			@model_jump(60, p_synapse, nu, p.xd[26] * alpha_h_r * frwd_VGCC, p.xd[26] * max_h_r * frwd_VGCC, typemax(Float64)), # 60
+			@model_jump(61, p_synapse, nu, p.xd[28] * beta_h_r  * bcwd_VGCC, p.xd[28] * max_h_r * bcwd_VGCC, typemax(Float64)), # 61
+			@model_jump(62, p_synapse, nu, p.xd[27] * alpha_m_r * frwd_VGCC, p.xd[27] * max_m_r * frwd_VGCC, typemax(Float64)), # 62
+			@model_jump(63, p_synapse, nu, p.xd[28] * beta_m_r  * bcwd_VGCC, p.xd[28] * max_m_r * bcwd_VGCC, typemax(Float64)), # 63
 
 
 			################### T-type VGCC  ###################
-			@model_jump(64, p_synapse, nu, Glu, p.xd[29] * alpha_m_t * frwd_VGCC, p.xd[29] * max_m_t * frwd_VGCC, typemax(Float64)), # 64
-			@model_jump(65, p_synapse, nu, Glu, p.xd[30] * beta_m_t  * bcwd_VGCC, p.xd[30] * max_m_t * bcwd_VGCC, typemax(Float64)), # 65 this one can have a high rate
-			@model_jump(66, p_synapse, nu, Glu, p.xd[29] * alpha_h_t * frwd_VGCC, p.xd[29] * max_h_t * frwd_VGCC, typemax(Float64)), # 66
-			@model_jump(67, p_synapse, nu, Glu, p.xd[31] * beta_h_t  * bcwd_VGCC, p.xd[31] * max_h_t * bcwd_VGCC, typemax(Float64)), # 67
-			@model_jump(68, p_synapse, nu, Glu, p.xd[30] * alpha_h_t * frwd_VGCC, p.xd[30] * max_h_t * frwd_VGCC, typemax(Float64)), # 68
-			@model_jump(69, p_synapse, nu, Glu, p.xd[32] * beta_h_t  * bcwd_VGCC, p.xd[32] * max_h_t * bcwd_VGCC, typemax(Float64)), # 69
-			@model_jump(70, p_synapse, nu, Glu, p.xd[31] * alpha_m_t * frwd_VGCC, p.xd[31] * max_m_t * frwd_VGCC, typemax(Float64)), # 70
-			@model_jump(71, p_synapse, nu, Glu, p.xd[32] * beta_m_t  * bcwd_VGCC, p.xd[32] * max_m_t * bcwd_VGCC, typemax(Float64)), # 71, this one can have a high rate
+			@model_jump(64, p_synapse, nu, p.xd[29] * alpha_m_t * frwd_VGCC, p.xd[29] * max_m_t * frwd_VGCC, typemax(Float64)), # 64
+			@model_jump(65, p_synapse, nu, p.xd[30] * beta_m_t  * bcwd_VGCC, p.xd[30] * max_m_t * bcwd_VGCC, typemax(Float64)), # 65 this one can have a high rate
+			@model_jump(66, p_synapse, nu, p.xd[29] * alpha_h_t * frwd_VGCC, p.xd[29] * max_h_t * frwd_VGCC, typemax(Float64)), # 66
+			@model_jump(67, p_synapse, nu, p.xd[31] * beta_h_t  * bcwd_VGCC, p.xd[31] * max_h_t * bcwd_VGCC, typemax(Float64)), # 67
+			@model_jump(68, p_synapse, nu, p.xd[30] * alpha_h_t * frwd_VGCC, p.xd[30] * max_h_t * frwd_VGCC, typemax(Float64)), # 68
+			@model_jump(69, p_synapse, nu, p.xd[32] * beta_h_t  * bcwd_VGCC, p.xd[32] * max_h_t * bcwd_VGCC, typemax(Float64)), # 69
+			@model_jump(70, p_synapse, nu, p.xd[31] * alpha_m_t * frwd_VGCC, p.xd[31] * max_m_t * frwd_VGCC, typemax(Float64)), # 70
+			@model_jump(71, p_synapse, nu, p.xd[32] * beta_m_t  * bcwd_VGCC, p.xd[32] * max_m_t * bcwd_VGCC, typemax(Float64)), # 71, this one can have a high rate
 
 			################### L-type VGCC  ###################
-			@model_jump(72, p_synapse, nu, Glu, p.xd[33] * alpha_l  * frwd_VGCC, p.xd[33] * max_alpha_l  * frwd_VGCC, typemax(Float64)), # 72
-			@model_jump(73, p_synapse, nu, Glu, p.xd[34] * beta_1_l * bcwd_VGCC, p.xd[34] * max_beta_1_l * bcwd_VGCC, typemax(Float64)), # 73
-			@model_jump(74, p_synapse, nu, Glu, p.xd[33] * alpha_l  * frwd_VGCC, p.xd[33] * max_alpha_l  * frwd_VGCC, typemax(Float64)), # 74
-			@model_jump(75, p_synapse, nu, Glu, p.xd[35] * beta_2_l * bcwd_VGCC, p.xd[35] * max_beta_2_l * bcwd_VGCC, typemax(Float64)), # 75
+			@model_jump(72, p_synapse, nu, p.xd[33] * alpha_l  * frwd_VGCC, p.xd[33] * max_alpha_l  * frwd_VGCC, typemax(Float64)), # 72
+			@model_jump(73, p_synapse, nu, p.xd[34] * beta_1_l * bcwd_VGCC, p.xd[34] * max_beta_1_l * bcwd_VGCC, typemax(Float64)), # 73
+			@model_jump(74, p_synapse, nu, p.xd[33] * alpha_l  * frwd_VGCC, p.xd[33] * max_alpha_l  * frwd_VGCC, typemax(Float64)), # 74
+			@model_jump(75, p_synapse, nu, p.xd[35] * beta_2_l * bcwd_VGCC, p.xd[35] * max_beta_2_l * bcwd_VGCC, typemax(Float64)), # 75
 
 			################### LTD/LTP  ###################
 			# TODO: determine correct bounds, this is just a guess based on plots of
 			# plasticityRate(u[27], 2, p_synapse, K_D) / t_P and plasticityRate(u[28], 2, K_D) / t_D)
-			@model_jump(76, p_synapse, nu, Glu, p.xd[36] * D_rate, 1, typemax(Float64)), # 76
-			@model_jump(77, p_synapse, nu, Glu, p.xd[37] * P_rate, 1, typemax(Float64)), # 77
-			@model_jump(78, p_synapse, nu, Glu, p.xd[36] * P_rate, 1, typemax(Float64)), # 78
-			@model_jump(79, p_synapse, nu, Glu, p.xd[38] * D_rate, 1, typemax(Float64)), # 79
+			@model_jump(76, p_synapse, nu, p.xd[36] * D_rate, 1, typemax(Float64)), # 76
+			@model_jump(77, p_synapse, nu, p.xd[37] * P_rate, 1, typemax(Float64)), # 77
+			@model_jump(78, p_synapse, nu, p.xd[36] * P_rate, 1, typemax(Float64)), # 78
+			@model_jump(79, p_synapse, nu, p.xd[38] * D_rate, 1, typemax(Float64)), # 79
 		],
 	)
 
-	return p, jumps
+	return jumps
 end
 
 function buildRxDependencyGraph(nu)
@@ -491,7 +479,7 @@ function buildRxDependencyGraph(nu)
 end
 
 function _saving_initialize(cb, u, t, integrator)
-	integrator.p.xd[:] = integrator.p.xd0
+	integrator.p.xd .= integrator.p.xd0
 	if cb.affect!.saveiter != 0
 		if integrator.tdir > 0
 			cb.affect!.saveat = BinaryMinHeap(cb.affect!.saveat_cache)
@@ -509,28 +497,27 @@ function _SavingCallback(save_func, saved_values::SavedValues;
                         save_start = save_everystep || isempty(saveat) || saveat isa Number,
                         save_end = save_everystep || isempty(saveat) || saveat isa Number,
                         tdir = 1)
-    # saveat conversions, see OrdinaryDiffEq.jl -> integrators/type.jl
-    saveat_vec = collect(saveat)
-    if tdir > 0
-        saveat_internal = BinaryMinHeap(saveat_vec)
-    else
-        saveat_internal = BinaryMaxHeap(saveat_vec)
-    end
-    affect! = SavingAffect(save_func, saved_values, saveat_internal, saveat_vec,
-                           save_everystep, save_start, save_end, 0)
-    condition = (u, t, integrator) -> true
-    DiscreteCallback(condition, affect!;
-                     initialize = _saving_initialize,
-                     save_positions = (false, false))
+	# adapted from DiffEqCallbacks.jl/src/saving.jl
+	saveat_vec = collect(saveat)
+	if tdir > 0
+	saveat_internal = BinaryMinHeap(saveat_vec)
+	else
+	saveat_internal = BinaryMaxHeap(saveat_vec)
+	end
+	affect! = SavingAffect(save_func, saved_values, saveat_internal, saveat_vec,
+				save_everystep, save_start, save_end, 0)
+	condition = (u, t, integrator) -> true
+	DiscreteCallback(condition, affect!;
+			initialize = _saving_initialize,
+			save_positions = (false, false))
 end
 
-function SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, glu, p_synapse, nu, algo, agg; save_positions = (false, true), kwargs...)
-	p, jumps = J_synapse(p_synapse, nu, glu, xd)
+function SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, glu, p_synapse, nu, algo, agg; jumps = nothing, save_positions = (false, true), saveat = [], kwargs...)
+	p = (xd0 = copy(xd), xd = copy(xd), Glu = p_synapse.glu_amp * glu, p_synapse = p_synapse)
 	oprob = ODEProblem((du, u, p, t) -> G_synapse(du, u, p.xd, p.p_synapse, t, events_bap, bap_by_epsp), xc, (t1, t2), p)
 	xdsol = SavedValues(typeof(t1), typeof(xd))
-        cb = _SavingCallback((u, t, integrator) -> integrator.p.xd[:], xdsol)
+        cb = _SavingCallback((u, t, integrator) -> copy(integrator.p.xd), xdsol)
 	dep_graph = buildRxDependencyGraph(nu)
-	jprob = JumpProblem(oprob, agg, jumps; dep_graph = dep_graph, save_positions = save_positions, callback=cb)
-        return (xcsol = solve(jprob, algo; kwargs...), xdsol = xdsol)
+	jprob = JumpProblem(oprob, agg, jumps; dep_graph, save_positions, saveat, callback=cb)
+        return (xcsol = solve(jprob, algo; saveat, abstol, reltol, kwargs...), xdsol = xdsol)
 end
-

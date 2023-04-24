@@ -31,12 +31,12 @@ function evolveSynapse(xc0::Vector{T}, xd0, p_synapse::SynapseParams,
 	events_sorted_times, is_pre_or_post_event, bap_by_epsp,
 	is_glu_released, nu, algos, agg = nothing;
 	verbose = false, progress = false, abstol = 1e-8, reltol = 1e-7,
-	save_positions = (false, true), kwargs...) where T
+	save_positions = (false, true), saveat = [], kwargs...) where T
 
 	tt, XC, XD = evolveSynapse_noformat(xc0, xd0, p_synapse,
 		events_sorted_times, is_pre_or_post_event, bap_by_epsp,
-		is_glu_released, nu, algos, agg; verbose = verbose, progress = progress,
-		abstol = abstol, reltol = reltol, save_positions = save_positions, kwargs...)
+		is_glu_released, nu, algos, agg; verbose, progress,
+		abstol, reltol, save_positions, saveat, kwargs...)
 
 	# format the output to make it convenient to parse
 	# this is wasting a lot of ressources but is convenient for plotting
@@ -53,7 +53,7 @@ function evolveSynapse_noformat(xc0::Vector{T}, xd0, p_synapse::SynapseParams,
 	events_sorted_times, is_pre_or_post_event, bap_by_epsp,
 	is_glu_released, nu, algos, agg = nothing;
 	verbose = false, progress = false, abstol = 1e-8, reltol = 1e-7,
-	save_positions = (false, true), kwargs...) where T
+	save_positions = (false, true), saveat = [], kwargs...) where T
 
 	if save_positions isa Tuple{Bool, Bool}
 		save_positionsON = save_positions
@@ -72,8 +72,10 @@ function evolveSynapse_noformat(xc0::Vector{T}, xd0, p_synapse::SynapseParams,
 	XC = VectorOfArray([xc0]) # vector to hold continuous variables
 	if isnothing(agg)
 		XD = VectorOfArray([xd0]) # vector to hold discrete variables
+                jumps = nothing
 	else
-		XD = VectorOfArray([typeof(xc0)(xd0)])
+		XD = VectorOfArray([xd0])
+                jumps = J_synapse(p_synapse, nu)
 	end
 	tt = [0.0] # vector of times
 
@@ -81,10 +83,10 @@ function evolveSynapse_noformat(xc0::Vector{T}, xd0, p_synapse::SynapseParams,
 	events_bap = events_sorted_times[is_pre_or_post_event .== false]
 
 	# function to simulate the synapse when Glutamate is ON
-	SimGluON = (xc, xd, t1, t2, glu) -> SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, glu, p_synapse, nu, algos[1], agg; save_positions = save_positionsON, reltol = reltol, abstol = abstol, kwargs...)
+	SimGluON = (xc, xd, t1, t2, glu) -> SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, glu, p_synapse, nu, algos[1], agg; jumps, reltol, abstol, saveat, save_positions = save_positionsON, kwargs...)
 
 	# function to simulate the synapse when Glutamate is OFF
-	SimGluOFF = (xc, xd, t1, t2) -> SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, zero(T), p_synapse, nu, algos[2], agg; save_positions = save_positionsOFF, reltol = reltol, abstol = abstol, kwargs...)
+	SimGluOFF = (xc, xd, t1, t2) -> SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, zero(T), p_synapse, nu, algos[2], agg; jumps, reltol, abstol, saveat, save_positions = save_positionsOFF, kwargs...)
 
 	# variable to display progressbar during simulation
 	# +1 for the last big till p_synapse.t_end
@@ -146,7 +148,7 @@ end
 
 function formatSimResult!(res::NamedTuple, XC, XD, tt)
 	append!(XC, VectorOfArray(res.xcsol.u))
-        append!(XD, VectorOfArray(res.xdsol.saveval))
+	append!(XD, VectorOfArray(res.xdsol.saveval))
 	append!(tt, res.xcsol.t)
 	nothing
 end
