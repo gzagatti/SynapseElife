@@ -2,7 +2,8 @@
 using Test
 using Profile, ProfileSVG
 using Synapse
-using PiecewiseDeterministicMarkovProcesses, JumpProcesses, OrdinaryDiffEq, Sundials, LSODA, DiffEqCallbacks
+using OrdinaryDiffEq, Sundials, LSODA # solvers
+using PiecewiseDeterministicMarkovProcesses, JumpProcesses, DiffEqCallbacks
 const PDMP = PiecewiseDeterministicMarkovProcesses
 
 ##### Parameters
@@ -21,7 +22,6 @@ xc0 = initial_conditions_continuous_temp(p_synapse);
 xd0 = initial_conditions_discrete(p_synapse);
 
 ##### Jump problem
-
 jsave_positions = (false, false);
 jsaveat = 0.05
 
@@ -33,13 +33,12 @@ jalgos = (AutoTsit5(Rosenbrock23()), AutoTsit5(Rosenbrock23()));
 
 jumps = J_synapse(p_synapse, nu);
 p = (xd0 = copy(xd0), xd = copy(xd0), Glu = p_synapse.glu_amp * glu, p_synapse = p_synapse)
-oprob = ODEProblem((du, u, p, t) -> G_synapse(du, u, p.xd, p.p_synapse, t, events_bap, bap_by_epsp), xc0, (t1, t2), p);
+oprob = ODEProblem((du, u, p, t) -> F_synapse(du, u, p.xd, p.p_synapse, t, events_bap, bap_by_epsp), xc0, (t1, t2), p);
 xdsol = SavedValues(typeof(t1), typeof(xd0));
 cb = Synapse._SavingCallback((u, t, integrator) -> integrator.p.xd[:], xdsol; saveat=t1:jsaveat:t2);
 dep_graph = buildRxDependencyGraph(nu);
 
 # Coevolve
-
 coagg = CoevolveSynced();
 
 coprob = JumpProblem(oprob, coagg, jumps; dep_graph = dep_graph, save_positions = jsave_positions, callback=cb, saveat=jsaveat);
@@ -121,7 +120,6 @@ coresult = @time evolveSynapse(
 
 # too slow on this branch
 # # Direct
-
 # diagg = Direct();
 
 # diprob = JumpProblem(oprob, diagg, jumps; dep_graph = dep_graph, save_positions = jsave_positions, callback=cb, saveat=jsaveat);
@@ -145,7 +143,6 @@ coresult = @time evolveSynapse(
 # );
 
 #### PDMP problem
-
 pdmpsave_positions = (false, true);
 
 pdmpagg = nothing;
@@ -155,7 +152,7 @@ pdmpagg = nothing;
 pdmpalgos = (CHV(AutoTsit5(Rosenbrock23())), CHV(AutoTsit5(Rosenbrock23())));
 
 pdmpprob = PDMP.PDMPProblem(
-	(xdot, xc, xd, p, t) -> F_synapse(xdot, xc, xd, p, t, events_bap, bap_by_epsp),
+	(dxc, xc, xd, p, t) -> F_synapse(dxc, xc, xd, p, t, events_bap, bap_by_epsp),
 	(rate, xc, xd, p, t, sum_rate) -> R_synapse(rate, xc, xd, p, t, sum_rate, glu),
 	nu, xc0, xd0, p_synapse, (t1, t2);
 	Ncache = 12) # this option is for AD in PreallocationTools
@@ -174,6 +171,7 @@ pdmpresult = @time evolveSynapse(
 	pdmpalgos,
 	pdmpagg;
 	save_positions = pdmpsave_positions,
+	save_everystep = false,
 );
 
 # @test ~isnothing(result);
