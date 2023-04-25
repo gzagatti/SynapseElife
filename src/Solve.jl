@@ -27,166 +27,324 @@ Perform a simulation of the synapse model. Among other things, you need to provi
 - `save_positions = (false, true)` save the values (before, after) the jumps (transitions)
 - `nu` transition matrix. It is initialised with `buildTransitionMatrix()`.
 """
-function evolveSynapse(xc0::Vector{T}, xd0, p_synapse::SynapseParams,
-	events_sorted_times, is_pre_or_post_event, bap_by_epsp,
-	is_glu_released, nu, algos, agg = nothing;
-	verbose = false, progress = false, abstol = 1e-8, reltol = 1e-7,
-	save_positions = (false, true), saveat = [], kwargs...) where T
+function evolveSynapse(
+    xc0::Vector{T},
+    xd0,
+    p_synapse::SynapseParams,
+    events_sorted_times,
+    is_pre_or_post_event,
+    bap_by_epsp,
+    is_glu_released,
+    nu,
+    algos,
+    agg = nothing;
+    verbose = false,
+    progress = false,
+    abstol = 1e-8,
+    reltol = 1e-7,
+    save_positions = (false, true),
+    saveat = [],
+    kwargs...,
+) where {T}
 
-	tt, XC, XD = evolveSynapse_noformat(xc0, xd0, p_synapse,
-		events_sorted_times, is_pre_or_post_event, bap_by_epsp,
-		is_glu_released, nu, algos, agg; verbose, progress,
-		abstol, reltol, save_positions, saveat, kwargs...)
+    tt, XC, XD = evolveSynapse_noformat(
+        xc0,
+        xd0,
+        p_synapse,
+        events_sorted_times,
+        is_pre_or_post_event,
+        bap_by_epsp,
+        is_glu_released,
+        nu,
+        algos,
+        agg;
+        verbose,
+        progress,
+        abstol,
+        reltol,
+        save_positions,
+        saveat,
+        kwargs...,
+    )
 
-	# format the output to make it convenient to parse
-	# this is wasting a lot of ressources but is convenient for plotting
-	verbose && @printf("=> done! parsing results")
+    # format the output to make it convenient to parse
+    # this is wasting a lot of ressources but is convenient for plotting
+    verbose && @printf("=> done! parsing results")
 
-	out = formatSynapseResult(tt, XC, XD)
+    out = formatSynapseResult(tt, XC, XD)
 end
 
 
 """
 Same as `evolveSynapse` but do not format the output because it takes time.
 """
-function evolveSynapse_noformat(xc0::Vector{T}, xd0, p_synapse::SynapseParams,
-	events_sorted_times, is_pre_or_post_event, bap_by_epsp,
-	is_glu_released, nu, algos, agg = nothing;
-	verbose = false, progress = false, abstol = 1e-8, reltol = 1e-7,
-	save_positions = (false, true), saveat = [], kwargs...) where T
+function evolveSynapse_noformat(
+    xc0::Vector{T},
+    xd0,
+    p_synapse::SynapseParams,
+    events_sorted_times,
+    is_pre_or_post_event,
+    bap_by_epsp,
+    is_glu_released,
+    nu,
+    algos,
+    agg = nothing;
+    verbose = false,
+    progress = false,
+    abstol = 1e-8,
+    reltol = 1e-7,
+    save_positions = (false, true),
+    saveat = [],
+    kwargs...,
+) where {T}
 
-	if save_positions isa Tuple{Bool, Bool}
-		save_positionsON = save_positions
-		save_positionsOFF = save_positions
-	else
-		save_positionsON = save_positions[1]
-		save_positionsOFF = save_positions[2]
-	end
+    if save_positions isa Tuple{Bool,Bool}
+        save_positionsON = save_positions
+        save_positionsOFF = save_positions
+    else
+        save_positionsON = save_positions[1]
+        save_positionsOFF = save_positions[2]
+    end
 
-	@assert eltype(is_pre_or_post_event) == Bool "Provide booleans for glutamate releases."
-	@assert eltype(is_glu_released) == Bool "Provide booleans for glutamate indices."
+    @assert eltype(is_pre_or_post_event) == Bool "Provide booleans for glutamate releases."
+    @assert eltype(is_glu_released) == Bool "Provide booleans for glutamate indices."
 
-	verbose && printstyled(color=:red,"\n+++++++++++++++++++++++++++++\n")
-	verbose && printstyled(color=:red,"Synapse simulation")
+    verbose && printstyled(color = :red, "\n+++++++++++++++++++++++++++++\n")
+    verbose && printstyled(color = :red, "Synapse simulation")
 
-	XC = VectorOfArray([xc0]) # vector to hold continuous variables
-	if isnothing(agg)
-		XD = VectorOfArray([xd0]) # vector to hold discrete variables
-                jumps = nothing
-	else
-		XD = VectorOfArray([xd0])
-                jumps = J_synapse(p_synapse, nu)
-	end
-	tt = [0.0] # vector of times
+    XC = VectorOfArray([xc0]) # vector to hold continuous variables
+    if isnothing(agg)
+        XD = VectorOfArray([xd0]) # vector to hold discrete variables
+        jumps = nothing
+    else
+        XD = VectorOfArray([xd0])
+        jumps = J_synapse(p_synapse, nu)
+    end
+    tt = [0.0] # vector of times
 
-	# we collect which external events correspond to BaPs
-	events_bap = events_sorted_times[is_pre_or_post_event .== false]
+    # we collect which external events correspond to BaPs
+    events_bap = events_sorted_times[is_pre_or_post_event.==false]
 
-	# function to simulate the synapse when Glutamate is ON
-	SimGluON = (xc, xd, t1, t2, glu) -> SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, glu, p_synapse, nu, algos[1], agg; jumps, reltol, abstol, saveat, save_positions = save_positionsON, kwargs...)
+    # function to simulate the synapse when Glutamate is ON
+    SimGluON =
+        (xc, xd, t1, t2, glu) -> SynapseProblem(
+            xc,
+            xd,
+            t1,
+            t2,
+            events_bap,
+            bap_by_epsp,
+            glu,
+            p_synapse,
+            nu,
+            algos[1],
+            agg;
+            jumps,
+            reltol,
+            abstol,
+            saveat,
+            save_positions = save_positionsON,
+            kwargs...,
+        )
 
-	# function to simulate the synapse when Glutamate is OFF
-	SimGluOFF = (xc, xd, t1, t2) -> SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, zero(T), p_synapse, nu, algos[2], agg; jumps, reltol, abstol, saveat, save_positions = save_positionsOFF, kwargs...)
+    # function to simulate the synapse when Glutamate is OFF
+    SimGluOFF =
+        (xc, xd, t1, t2) -> SynapseProblem(
+            xc,
+            xd,
+            t1,
+            t2,
+            events_bap,
+            bap_by_epsp,
+            zero(T),
+            p_synapse,
+            nu,
+            algos[2],
+            agg;
+            jumps,
+            reltol,
+            abstol,
+            saveat,
+            save_positions = save_positionsOFF,
+            kwargs...,
+        )
 
-	# variable to display progressbar during simulation
-	# +1 for the last big till p_synapse.t_end
-	pbar = progress ? Progress(length(events_sorted_times) + 1, 1) : nothing
+    # variable to display progressbar during simulation
+    # +1 for the last big till p_synapse.t_end
+    pbar = progress ? Progress(length(events_sorted_times) + 1, 1) : nothing
 
-	# random variable for Glutamate concentration
-	gluDist = Gamma(1/p_synapse.glu_cv^2, p_synapse.glu_cv^2)
+    # random variable for Glutamate concentration
+    gluDist = Gamma(1 / p_synapse.glu_cv^2, p_synapse.glu_cv^2)
 
-	# we loop over the external events, simulate them and append to res
-	for (eveindex, eve) in enumerate(events_sorted_times)
-		verbose && printstyled(color=:red,"\n$(eveindex) / $(length(events_sorted_times)) +++++++++++++++++++++++\n")
-		if is_pre_or_post_event[eveindex] == true # it is a pre-synaptic event
-			# we simulate the synapse with Glutamate OFF until event time
-			# then we put  Glutamate ON for dt = p_synapse.glu_width with variable amplitude (concentration)
-			verbose && @printf("=> Glu Off,%4d, t ∈ [%9.4e, %9.4e]\n", eveindex, tt[end], eve)
+    # we loop over the external events, simulate them and append to res
+    for (eveindex, eve) in enumerate(events_sorted_times)
+        verbose && printstyled(
+            color = :red,
+            "\n$(eveindex) / $(length(events_sorted_times)) +++++++++++++++++++++++\n",
+        )
+        if is_pre_or_post_event[eveindex] == true # it is a pre-synaptic event
+            # we simulate the synapse with Glutamate OFF until event time
+            # then we put  Glutamate ON for dt = p_synapse.glu_width with variable amplitude (concentration)
+            verbose &&
+                @printf("=> Glu Off,%4d, t ∈ [%9.4e, %9.4e]\n", eveindex, tt[end], eve)
 
-			# simulate the event with Glutamate OFF
-			res = SimGluOFF(XC[:,end], XD[:,end], tt[end], eve)
-			formatSimResult!(res, XC, XD, tt)
-			gluamp = rand(gluDist)
-			verbose && @printf("=> Glu on, %4d, t ∈ [%9.4e, %9.4e]\n", eveindex, eve, eve+ p_synapse.glu_width )
+            # simulate the event with Glutamate OFF
+            res = SimGluOFF(XC[:, end], XD[:, end], tt[end], eve)
+            formatSimResult!(res, XC, XD, tt)
+            gluamp = rand(gluDist)
+            verbose && @printf(
+                "=> Glu on, %4d, t ∈ [%9.4e, %9.4e]\n",
+                eveindex,
+                eve,
+                eve + p_synapse.glu_width
+            )
 
-			# simulate the event with Glutamate ON
-			# variability here
-			res = SimGluON(XC[:,end], XD[:,end], eve, eve + p_synapse.glu_width,  ifelse(is_glu_released[eveindex], gluamp, zero(T)))
-			formatSimResult!(res, XC, XD, tt)
-		end
-		# update the progress bar
-		progress && next!(pbar; showvalues = [(:steps, eveindex), (:t, tt[end])])
-	end
-
-	# reaching tend: we simulate the synapse with Glutamate OFF until simulation end time required
-	# by the user. In  most protocol, this is taking most of the time.
-	verbose && @printf("=> Reaching the end, t ∈ [%9.4e, %9.4e]\n",tt[end], p_synapse.t_end)
-	res = @time SimGluOFF(XC[:,end], XD[:,end], tt[end], p_synapse.t_end)
-	formatSimResult!(res, XC, XD, tt)
-	if isnothing(agg)
-		@info "last bit" length(res.time) tt[end] p_synapse.t_end
-	else
-		@info "last bit" length(res.xcsol.t) tt[end] p_synapse.t_end
-	end
-
-	# update the progress bar
-	progress && next!(pbar; showvalues = [(:steps, length(events_sorted_times) + 1), (:t, p_synapse.t_end)])
-
-	if tt[end] != p_synapse.t_end 
-            @warn "The simulation did not reach requested simulated time."
+            # simulate the event with Glutamate ON
+            # variability here
+            res = SimGluON(
+                XC[:, end],
+                XD[:, end],
+                eve,
+                eve + p_synapse.glu_width,
+                ifelse(is_glu_released[eveindex], gluamp, zero(T)),
+            )
+            formatSimResult!(res, XC, XD, tt)
         end
+        # update the progress bar
+        progress && next!(pbar; showvalues = [(:steps, eveindex), (:t, tt[end])])
+    end
 
-	return (t = tt, XC = XC, XD = XD)
+    # reaching tend: we simulate the synapse with Glutamate OFF until simulation end time required
+    # by the user. In  most protocol, this is taking most of the time.
+    verbose &&
+        @printf("=> Reaching the end, t ∈ [%9.4e, %9.4e]\n", tt[end], p_synapse.t_end)
+    res = @time SimGluOFF(XC[:, end], XD[:, end], tt[end], p_synapse.t_end)
+    formatSimResult!(res, XC, XD, tt)
+    if isnothing(agg)
+        @info "last bit" length(res.time) tt[end] p_synapse.t_end
+    else
+        @info "last bit" length(res.xcsol.t) tt[end] p_synapse.t_end
+    end
+
+    # update the progress bar
+    progress && next!(
+        pbar;
+        showvalues = [(:steps, length(events_sorted_times) + 1), (:t, p_synapse.t_end)],
+    )
+
+    if tt[end] != p_synapse.t_end
+        @warn "The simulation did not reach requested simulated time."
+    end
+
+    return (t = tt, XC = XC, XD = XD)
 end
 
 function formatSimResult!(res::PDMP.PDMPResult, XC, XD, tt)
-	append!(XC, res.xc)
-	append!(XD, res.xd)
-	append!(tt, res.time)
-	nothing
+    append!(XC, res.xc)
+    append!(XD, res.xd)
+    append!(tt, res.time)
+    nothing
 end
 
 function formatSimResult!(res::NamedTuple, XC, XD, tt)
-	append!(XC, VectorOfArray(res.xcsol.u))
-	append!(XD, VectorOfArray(res.xdsol.saveval))
-	append!(tt, res.xcsol.t)
-	nothing
+    append!(XC, VectorOfArray(res.xcsol.u))
+    append!(XD, VectorOfArray(res.xdsol.saveval))
+    append!(tt, res.xcsol.t)
+    nothing
 end
 
 function formatSynapseResult(tt, XC, XD)
-	namesC = (:Vsp, :Vdend, :Vsoma, :λ, :ImbufCa, :Ca, :Dye, :CaM0, :CaM2C,
-		:CaM2N, :CaM4, :mCaN, :CaN4, :mKCaM, :KCaM0, :KCaM2N, :KCaM2C, :KCaM4,
-		:PCaM0, :PCaM2C, :PCaM2N, :PCaM4, :P, :P2, :LTD, :LTP, :act_D, :act_P,
-		:m, :h, :n, :SK ,:λ_age, :λ_aux)
-	values = (XC[i, :] for i in 1:length(namesC))
-	return (t = tt, XD = XD, XC = XC, zip(namesC, values)...)
+    namesC = (
+        :Vsp,
+        :Vdend,
+        :Vsoma,
+        :λ,
+        :ImbufCa,
+        :Ca,
+        :Dye,
+        :CaM0,
+        :CaM2C,
+        :CaM2N,
+        :CaM4,
+        :mCaN,
+        :CaN4,
+        :mKCaM,
+        :KCaM0,
+        :KCaM2N,
+        :KCaM2C,
+        :KCaM4,
+        :PCaM0,
+        :PCaM2C,
+        :PCaM2N,
+        :PCaM4,
+        :P,
+        :P2,
+        :LTD,
+        :LTP,
+        :act_D,
+        :act_P,
+        :m,
+        :h,
+        :n,
+        :SK,
+        :λ_age,
+        :λ_aux,
+    )
+    values = (XC[i, :] for i = 1:length(namesC))
+    return (t = tt, XD = XD, XC = XC, zip(namesC, values)...)
 end
 
 function indexOfVariable(name::Symbol)
-	names = (:Vsp, :Vdend, :Vsoma, :λ, :ImbufCa, :Ca, :Dye, :CaM0, :CaM2C,
-		:CaM2N, :CaM4, :mCaN, :CaN4, :mKCaM, :KCaM0, :KCaM2N, :KCaM2C, :KCaM4,
-		:PCaM0, :PCaM2C, :PCaM2N, :PCaM4, :P, :P2, :LTD, :LTP, :act_D, :act_P,
-		:m, :h, :n, :SK ,:λ_age, :λ_aux)
-	return findfirst(isequal(name), names)
+    names = (
+        :Vsp,
+        :Vdend,
+        :Vsoma,
+        :λ,
+        :ImbufCa,
+        :Ca,
+        :Dye,
+        :CaM0,
+        :CaM2C,
+        :CaM2N,
+        :CaM4,
+        :mCaN,
+        :CaN4,
+        :mKCaM,
+        :KCaM0,
+        :KCaM2N,
+        :KCaM2C,
+        :KCaM4,
+        :PCaM0,
+        :PCaM2C,
+        :PCaM2N,
+        :PCaM4,
+        :P,
+        :P2,
+        :LTD,
+        :LTP,
+        :act_D,
+        :act_P,
+        :m,
+        :h,
+        :n,
+        :SK,
+        :λ_age,
+        :λ_aux,
+    )
+    return findfirst(isequal(name), names)
 end
 
 function getCaM(t, XC, XD)
-	XC[indexOfVariable(:CaM2C), :] .+
-	XC[indexOfVariable(:CaM2N), :] .+
-	XC[indexOfVariable(:CaM4), :]
+    XC[indexOfVariable(:CaM2C), :] .+ XC[indexOfVariable(:CaM2N), :] .+
+    XC[indexOfVariable(:CaM4), :]
 end
 
 getCaN(t, XC, XD) = XC[indexOfVariable(:CaN4), :]
 
 function getCamKII(t, XC, XD)
-	return XC[indexOfVariable(:KCaM0), :]   .+
-		XC[indexOfVariable(:KCaM2C), :] .+
-		XC[indexOfVariable(:KCaM2N), :] .+
-		XC[indexOfVariable(:KCaM4), :]  .+
-		XC[indexOfVariable(:PCaM0), :]  .+
-		XC[indexOfVariable(:PCaM2C), :] .+
-		XC[indexOfVariable(:PCaM2N), :] .+
-		XC[indexOfVariable(:PCaM4), :]  .+
-		XC[indexOfVariable(:P), :]      .+
-		XC[indexOfVariable(:P2), :]
+    return XC[indexOfVariable(:KCaM0), :] .+ XC[indexOfVariable(:KCaM2C), :] .+
+           XC[indexOfVariable(:KCaM2N), :] .+ XC[indexOfVariable(:KCaM4), :] .+
+           XC[indexOfVariable(:PCaM0), :] .+ XC[indexOfVariable(:PCaM2C), :] .+
+           XC[indexOfVariable(:PCaM2N), :] .+ XC[indexOfVariable(:PCaM4), :] .+
+           XC[indexOfVariable(:P), :] .+ XC[indexOfVariable(:P2), :]
 end

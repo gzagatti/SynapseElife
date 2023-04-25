@@ -10,7 +10,7 @@ Calcium-dependent sigmoid for the vesicle release test.
 """
 
 @inline function releaseProbaSTP(Ca_pre, nhill, K)
-	return Ca_pre^nhill / (Ca_pre^nhill + K^nhill)
+    return Ca_pre^nhill / (Ca_pre^nhill + K^nhill)
 end
 
 """
@@ -28,16 +28,16 @@ has exponential decay constant. The variable `Ca_jump` is the adaptation of the 
 - `t` time
 """
 function stp_F_synapse!(xdot, pop_c, discrete_var, p_pre::PreSynapseParams, t)
-	Ca_pre, Ca_jump, V_evoke  = pop_c
-	@unpack_PreSynapseParams p_pre
+    Ca_pre, Ca_jump, V_evoke = pop_c
+    @unpack_PreSynapseParams p_pre
 
-	# Calcium
-	xdot[1]   =  -Ca_pre / τ_pre
-	# Decay term
-	xdot[2]   =  (1-Ca_jump) / τ_rec - δ_ca * Ca_jump * Ca_pre
-	# AP induced EPSP
-	xdot[3]   =  -V_evoke / τ_V
-	xdot
+    # Calcium
+    xdot[1] = -Ca_pre / τ_pre
+    # Decay term
+    xdot[2] = (1 - Ca_jump) / τ_rec - δ_ca * Ca_jump * Ca_pre
+    # AP induced EPSP
+    xdot[3] = -V_evoke / τ_V
+    xdot
 end
 
 """
@@ -61,20 +61,20 @@ different pools respecting their limit capacity.
 - `issum::Bool` variable used for the rejection algorithm
 """
 function stp_R_synapse!(rate, xc, xd, p_pre::PreSynapseParams, t, issum::Bool)
-	# the discrete variables are [nPrint, nDocked, nReserve]
-	# unpack the parameters
-	@unpack_PreSynapseParams p_pre
+    # the discrete variables are [nPrint, nDocked, nReserve]
+    # unpack the parameters
+    @unpack_PreSynapseParams p_pre
 
-	rate[1]  = sampling_rate			   # sampling rate for plotting
-	rate[2]  = (R_0 - xd[3]) * xd[2] / τ_R
-	rate[3]  = (D_0 - xd[2]) * xd[3] / τ_D
-	rate[4]  = (R_0 - xd[3]) / τ_R_ref
+    rate[1] = sampling_rate   # sampling rate for plotting
+    rate[2] = (R_0 - xd[3]) * xd[2] / τ_R
+    rate[3] = (D_0 - xd[2]) * xd[3] / τ_D
+    rate[4] = (R_0 - xd[3]) / τ_R_ref
 
-	if issum == false
-		return 0., 0. # we do not use rejection algorithm
-	else
-		return sum(rate), 0.
-	end
+    if issum == false
+        return 0.0, 0.0 # we do not use rejection algorithm
+    else
+        return sum(rate), 0.0
+    end
 end
 
 """
@@ -92,8 +92,9 @@ Definition of the PDMP problem for the presynaptic side.
 `algo = PDMP.CHV(:lsoda)` LSODA solver, used to solve this PDMP
 """
 function stpPDMP(xc0, xd0, parms, nu_stp, ti, tf; algo = PDMP.CHV(:lsoda), kwargs...)
-	problem = PDMP.PDMPProblem(stp_F_synapse!, stp_R_synapse!, nu_stp, xc0, xd0, parms, (ti, tf))
-	return solve(problem, algo; kwargs...)
+    problem =
+        PDMP.PDMPProblem(stp_F_synapse!, stp_R_synapse!, nu_stp, xc0, xd0, parms, (ti, tf))
+    return solve(problem, algo; kwargs...)
 end
 
 """
@@ -121,58 +122,78 @@ an AP was triggered by an EPSP. However, the successful "AP induced by EPSP" are
 - `release_time` list of successful presynaptic stimulation
 - `release_time_auxbap` list of the AP induced by EPSPs
 """
-function stp_evolve_synapse(t_end,
-			xc0, xd0,
-			par_pre::PreSynapseParams,
-			prespike::Vector{Float64},
-			nu = stp_build_transition_matrix();
-			kwargs...)
-	@assert findfirst(prespike .== 1) == nothing "Remove BaP from the list!!"
+function stp_evolve_synapse(
+    t_end,
+    xc0,
+    xd0,
+    par_pre::PreSynapseParams,
+    prespike::Vector{Float64},
+    nu = stp_build_transition_matrix();
+    kwargs...,
+)
+    @assert findfirst(prespike .== 1) == nothing "Remove BaP from the list!!"
 
-	XC = VectorOfArray([xc0])
-	XD = VectorOfArray([xd0])
-	tt = [0.0]
-	res = PDMP.PDMPResult([0.,0.], copy(XC), copy(XD))
+    XC = VectorOfArray([xc0])
+    XD = VectorOfArray([xd0])
+    tt = [0.0]
+    res = PDMP.PDMPResult([0.0, 0.0], copy(XC), copy(XD))
 
-	release_time = Vector{Float64}(undef, 0)
-	release_time_auxbap = Vector{Float64}(undef, 0)
+    release_time = Vector{Float64}(undef, 0)
+    release_time_auxbap = Vector{Float64}(undef, 0)
 
-	for (countloop, event) in enumerate(prespike)
-		################### Glutamate  ###################
-		res = stpPDMP(res.xc[:,end], res.xd[:,end], par_pre, nu, tt[end], event; kwargs...)
+    for (countloop, event) in enumerate(prespike)
+        ################### Glutamate  ###################
+        res =
+            stpPDMP(res.xc[:, end], res.xd[:, end], par_pre, nu, tt[end], event; kwargs...)
 
-		append!(XC, res.xc); append!(XD, res.xd); append!(tt, res.time)
+        append!(XC, res.xc)
+        append!(XD, res.xd)
+        append!(tt, res.time)
 
-		# we perform a deterministic jump
-		res.xc[1,end] += res.xc[2,end] # Ca_pre -> Ca_pre + Ca_jump
-		res.xc[3,end] += 1. 		   # V_evoke -> V_evoke + 1
+        # we perform a deterministic jump
+        res.xc[1, end] += res.xc[2, end] # Ca_pre -> Ca_pre + Ca_jump
+        res.xc[3, end] += 1.0    # V_evoke -> V_evoke + 1
 
-		if rand() < releaseProbaSTP(res.xc[1,end], par_pre.s, par_pre.h)
-			# we may have a  Glutamate release
-			if res.xd[2, end] > 0
-				# we have a docked vesicule
-				# we have a Glutamate release
-				res.xd[2, end] -= 1
-				# we save the Glu release time
-				push!(release_time, event)
-			end
-		end
+        if rand() < releaseProbaSTP(res.xc[1, end], par_pre.s, par_pre.h)
+            # we may have a  Glutamate release
+            if res.xd[2, end] > 0
+                # we have a docked vesicule
+                # we have a Glutamate release
+                res.xd[2, end] -= 1
+                # we save the Glu release time
+                push!(release_time, event)
+            end
+        end
 
-		# this is for Bap
-		if res.xd[2, end] > 0
-			auxbap = sum(rand(par_pre.D_0) .< releaseProbaSTP(res.xc[3,end], par_pre.s, par_pre.h))
-			if auxbap > .8 * par_pre.D_0 					# 80%
-				push!(release_time_auxbap, event + par_pre.δ_delay_AP)
-			end
-		end
+        # this is for Bap
+        if res.xd[2, end] > 0
+            auxbap = sum(
+                rand(par_pre.D_0) .< releaseProbaSTP(res.xc[3, end], par_pre.s, par_pre.h),
+            )
+            if auxbap > 0.8 * par_pre.D_0 # 80%
+                push!(release_time_auxbap, event + par_pre.δ_delay_AP)
+            end
+        end
 
-		res = stpPDMP(res.xc[:,end],res.xd[:,end], par_pre, nu, event, event + .1; kwargs...)
-		append!(XC, res.xc); append!(XD, res.xd); append!(tt, res.time)
-	end
-	res = stpPDMP(res.xc[:,end],res.xd[:,end], par_pre, nu, tt[end], t_end; kwargs...)
-	append!(XC, res.xc); append!(XD, res.xd); append!(tt, res.time)
-	@assert res.time[end] == t_end "Error in PDMP. Did not reach requested simulated time"
-	return tt, XC, XD, release_time, release_time_auxbap
+        res = stpPDMP(
+            res.xc[:, end],
+            res.xd[:, end],
+            par_pre,
+            nu,
+            event,
+            event + 0.1;
+            kwargs...,
+        )
+        append!(XC, res.xc)
+        append!(XD, res.xd)
+        append!(tt, res.time)
+    end
+    res = stpPDMP(res.xc[:, end], res.xd[:, end], par_pre, nu, tt[end], t_end; kwargs...)
+    append!(XC, res.xc)
+    append!(XD, res.xd)
+    append!(tt, res.time)
+    @assert res.time[end] == t_end "Error in PDMP. Did not reach requested simulated time"
+    return tt, XC, XD, release_time, release_time_auxbap
 end
 
 """
@@ -198,28 +219,38 @@ This function performs the simulation of the presynaptic side.
 - `glu_release_times` the vector of times in which a successful releases (glutamate) occurred
 - `bap_by_epsp_times` the vector of times in which an AP was triggered by an EPSP
 """
-function stp(t_end, param,
-			all_events_times,
-			is_pre_or_post_index;
-			_plot = false,
-			nu_stp = stp_build_transition_matrix(),
-			kwargs...)
-	# presynaptic spikes
-	_prespike = all_events_times[is_pre_or_post_index .== true ]
-	prespike = _prespike[_prespike.<t_end]
+function stp(
+    t_end,
+    param,
+    all_events_times,
+    is_pre_or_post_index;
+    _plot = false,
+    nu_stp = stp_build_transition_matrix(),
+    kwargs...,
+)
+    # presynaptic spikes
+    _prespike = all_events_times[is_pre_or_post_index.==true]
+    prespike = _prespike[_prespike.<t_end]
 
-	tt, XC, XD, glu_release_times, bap_by_epsp_times = stp_evolve_synapse(
-				t_end,
-				[0., 1. , 0.],
-				[0, param.D_0, param.R_0],
-				param,
-				prespike,
-				nu_stp;
-				kwargs...) # model function
+    tt, XC, XD, glu_release_times, bap_by_epsp_times = stp_evolve_synapse(
+        t_end,
+        [0.0, 1.0, 0.0],
+        [0, param.D_0, param.R_0],
+        param,
+        prespike,
+        nu_stp;
+        kwargs...,
+    ) # model function
 
-	is_glu_release = zeros(Bool, length(all_events_times))
-	idx = findall(x -> x ∈ glu_release_times, all_events_times)
-	is_glu_release[idx] .= true
+    is_glu_release = zeros(Bool, length(all_events_times))
+    idx = findall(x -> x ∈ glu_release_times, all_events_times)
+    is_glu_release[idx] .= true
 
-	return is_glu_release, XD[2,:], XD[3,:], tt, glu_release_times, bap_by_epsp_times, XC[1,:]
+    return is_glu_release,
+    XD[2, :],
+    XD[3, :],
+    tt,
+    glu_release_times,
+    bap_by_epsp_times,
+    XC[1, :]
 end
