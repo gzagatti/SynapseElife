@@ -516,8 +516,19 @@ function SynapseProblem(xc, xd, t1, t2, events_bap, bap_by_epsp, glu, p_synapse,
 	p = (xd0 = copy(xd), xd = copy(xd), Glu = p_synapse.glu_amp * glu, p_synapse = p_synapse)
 	oprob = ODEProblem((du, u, p, t) -> G_synapse(du, u, p.xd, p.p_synapse, t, events_bap, bap_by_epsp), xc, (t1, t2), p)
 	xdsol = SavedValues(typeof(t1), typeof(xd))
-        cb = _SavingCallback((u, t, integrator) -> copy(integrator.p.xd), xdsol)
+	if typeof(saveat) <: Number
+		saveat = t1:saveat:t2
+	end
+        cb = _SavingCallback((u, t, integrator) -> copy(integrator.p.xd), xdsol; saveat)
 	dep_graph = buildRxDependencyGraph(nu)
 	jprob = JumpProblem(oprob, agg, jumps; dep_graph, save_positions, saveat, callback=cb)
-        return (xcsol = solve(jprob, algo; saveat, abstol, reltol, kwargs...), xdsol = xdsol)
+        sol = (xcsol = solve(jprob, algo; saveat, kwargs...), xdsol = xdsol)
+        @info "Integrator" sol.xcsol.stats
+	# with tweaked JumpProcesses.jl
+	# total_jumps = (jprob.discrete_jump_aggregation.rejections + jprob.discrete_jump_aggregation.jumps)
+	# rejections = jprob.discrete_jump_aggregation.rejections[total_jumps .> 0]
+	# total_jumps = total_jumps[total_jumps .> 0]
+	# rejection_rate = sum(rejections ./ total_jumps) ./ length(total_jumps)
+	# @info "Rejection rate" rejection_rate
+        return sol
 end
