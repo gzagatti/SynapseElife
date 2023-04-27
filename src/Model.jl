@@ -908,7 +908,15 @@ function _SavingCallback(
         save_end,
         0,
     )
-    condition = (u, t, integrator) -> true
+    function condition(u, t, integrator)
+
+        if integrator.u_modified
+            push!(affect!.saveat, t)
+        end
+
+        return true
+
+    end
     DiscreteCallback(
         condition,
         affect!;

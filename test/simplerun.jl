@@ -21,8 +21,8 @@ xc0 = initial_conditions_continuous_temp(p_synapse);
 xd0 = initial_conditions_discrete(p_synapse);
 
 ##### Jump problem
-jsave_positions = (false, false);
-jsaveat = 0.05
+jsave_positions = (false, true);
+jsaveat = 1.0
 
 # jalgos = (Tsit5(), Tsit5());
 # jalgos = (TRBDF2(), TRBDF2());
@@ -86,6 +86,8 @@ coresult = @time evolveSynapse(
     saveat = jsaveat,
     save_everystep = false,
 );
+
+# @test sum(coresult.XD[end]) == 278
 
 # # Replicate PDMP stepper
 # jumps = J_synapse(p_synapse, nu);
@@ -195,6 +197,8 @@ pdmpresult = @time evolveSynapse(
     save_positions = pdmpsave_positions,
     save_everystep = false,
 );
+
+# @test sum(pdmpresult.XD[end])-maximum(pdmpresult.XD[end]) == 278
 
 # @test ~isnothing(result);
 
