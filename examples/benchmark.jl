@@ -1,45 +1,30 @@
 using Synapse
 using PiecewiseDeterministicMarkovProcesses, JumpProcesses, OrdinaryDiffEq, Plots
 using BenchmarkTools
+fmt = :png
 
-root = dirname(@__DIR__)
-assets = "$(root)/assets"
-
-# parameters
 p_synapse = SynapseParams(t_end = 1000.0);
 glu = 0.0;
 events_sorted_times = [500.0];
 is_pre_or_post_event = [true];
 events_bap = events_sorted_times[is_pre_or_post_event.==false];
 bap_by_epsp = Float64[];
-t1 = 0.0;
-t2 = 500.0;
 nu = buildTransitionMatrix();
 
-# initial conditions
 xc0 = initial_conditions_continuous_temp(p_synapse);
 xd0 = initial_conditions_discrete(p_synapse);
 
-# algorithms to benchmark
 solver = AutoTsit5(Rosenbrock23());
 algorithms = [
+    (label = "PDMP", agg = nothing, solver = (CHV(solver), CHV(solver)), saveat = []),
     (
-        label = "PDMP",
-        agg = nothing,
-        solver = (CHV(solver), CHV(solver)),
-        save_positions = (false, true), # necessary to save at regular intervals
-        saveat = [],
-    ),
-    (
-        label = "Coevolve",
+        label = "CoevolveSynced",
         agg = CoevolveSynced(),
         solver = (solver, solver),
-        save_positions = (false, false),
-        saveat = 0.05, # similar rate as the PDMP problem
+        saveat = 1 / p_synapse.sampling_rate,
     ),
 ];
 
-# initial run for pre-compilation purposes
 results = []
 
 for algo in algorithms
@@ -56,14 +41,15 @@ for algo in algorithms
             nu,
             algo.solver,
             algo.agg;
-            save_positions = algo.save_positions,
+            save_positions = (false, true),
             saveat = algo.saveat,
             save_everystep = false,
+            save_start = true,
+            save_end = true,
         ),
     )
 end
 
-# plot results to check they are correct
 fig = plot(xlabel = "Voltage", ylabel = "Time");
 for (i, algo) in enumerate(algorithms)
     res = results[i]
@@ -78,7 +64,6 @@ for (i, algo) in enumerate(algorithms)
 end
 title!("2line-Go, AMPA")
 
-# benchmarks
 bs = Vector{BenchmarkTools.Trial}()
 
 for algo in algorithms
@@ -96,7 +81,7 @@ for algo in algorithms
                 nu,
                 $(algo).solver,
                 $(algo).agg;
-                save_positions = $(algo).save_positions,
+                save_positions = (false, true),
                 saveat = $(algo).saveat,
                 save_everystep = false,
             ),
@@ -106,3 +91,18 @@ for algo in algorithms
         )
     )
 end
+
+labels = [a.label for a in algorithms]
+medtimes =
+    [text(string(round(median(b).time / 1e9, digits = 3), "s"), :center, 12) for b in bs]
+relmedtimes = [median(b).time for b in bs]
+relmedtimes ./= relmedtimes[1]
+bar(labels, relmedtimes, markeralpha = 0, series_annotation = medtimes, fmt = fmt)
+title!("evolveSynapse (Median time)")
+
+medmem =
+    [text(string(round(median(b).memory / 1e6, digits = 3), "Mb"), :center, 12) for b in bs]
+relmedmem = Float64[median(b).memory for b in bs]
+relmedmem ./= relmedmem[1]
+bar(labels, relmedmem, markeralpha = 0, series_annotation = medmem, fmt = fmt)
+title!("evolveSynapse (Median memory)")

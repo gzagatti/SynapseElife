@@ -8,8 +8,8 @@ using StaticArrays # for using LazySets in efficient way
 using Plots
 using LinearAlgebra, RecursiveArrayTools
 using DifferentialEquations, LSODA, Sundials
-using DiffEqCallbacks: SavedValues, SavingAffect
-using DataStructures: BinaryMinHeap, BinaryMaxHeap
+using DiffEqCallbacks: SavedValues
+import DataStructures
 using JumpProcesses
 using PiecewiseDeterministicMarkovProcesses
 const PDMP = PiecewiseDeterministicMarkovProcesses
@@ -18,6 +18,7 @@ include("ParamsSynapse.jl")
 include("UtilsData.jl")
 include("UtilsDynamics.jl")
 include("JumpMatrices.jl")
+include("SavingCallback.jl")
 include("Model.jl")
 include("Solve.jl")
 include("OnlyStp.jl")

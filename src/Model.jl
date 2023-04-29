@@ -869,62 +869,6 @@ function buildRxDependencyGraph(nu)
     return dep_graph
 end
 
-function _saving_initialize(cb, u, t, integrator)
-    integrator.p.xd .= integrator.p.xd0
-    if cb.affect!.saveiter != 0
-        if integrator.tdir > 0
-            cb.affect!.saveat = BinaryMinHeap(cb.affect!.saveat_cache)
-        else
-            cb.affect!.saveat = BinaryMaxHeap(cb.affect!.saveat_cache)
-        end
-        cb.affect!.saveiter = 0
-    end
-    cb.affect!.save_start && cb.affect!(integrator)
-end
-
-function _SavingCallback(
-    save_func,
-    saved_values::SavedValues;
-    saveat = Vector{eltype(saved_values.t)}(),
-    save_everystep = isempty(saveat),
-    save_start = save_everystep || isempty(saveat) || saveat isa Number,
-    save_end = save_everystep || isempty(saveat) || saveat isa Number,
-    tdir = 1,
-)
-    # adapted from DiffEqCallbacks.jl/src/saving.jl
-    saveat_vec = collect(saveat)
-    if tdir > 0
-        saveat_internal = BinaryMinHeap(saveat_vec)
-    else
-        saveat_internal = BinaryMaxHeap(saveat_vec)
-    end
-    affect! = SavingAffect(
-        save_func,
-        saved_values,
-        saveat_internal,
-        saveat_vec,
-        save_everystep,
-        save_start,
-        save_end,
-        0,
-    )
-    function condition(u, t, integrator)
-
-        if integrator.u_modified
-            push!(affect!.saveat, t)
-        end
-
-        return true
-
-    end
-    DiscreteCallback(
-        condition,
-        affect!;
-        initialize = _saving_initialize,
-        save_positions = (false, false),
-    )
-end
-
 function SynapseProblem(
     xc,
     xd,
@@ -987,16 +931,8 @@ function SynapseProblem(
         p,
     )
     xdsol = SavedValues(typeof(t1), typeof(xd))
-    if typeof(saveat) <: Number
-        saveat = t1:saveat:t2
-    end
-    callback = _SavingCallback(
-        (u, t, integrator) -> copy(integrator.p.xd),
-        xdsol;
-        saveat,
-        save_everystep,
-    )
     dep_graph = buildRxDependencyGraph(nu)
+    callback = _SavingCallback((u, t, integrator) -> copy(integrator.p.xd), xdsol)
     jprob = JumpProblem(
         oprob,
         agg,

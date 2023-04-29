@@ -221,9 +221,9 @@ function evolveSynapse_noformat(
     res = @time SimGluOFF(XC[:, end], XD[:, end], tt[end], p_synapse.t_end)
     formatSimResult!(res, XC, XD, tt)
     if isnothing(agg)
-        @info "last bit" length(res.time) tt[end] p_synapse.t_end
+        @info "last bit" agg length(res.time) tt[end] p_synapse.t_end
     else
-        @info "last bit" length(res.xcsol.t) tt[end] p_synapse.t_end
+        @info "last bit" agg length(res.xcsol.t) tt[end] p_synapse.t_end
     end
 
     # update the progress bar

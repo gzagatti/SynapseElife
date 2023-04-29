@@ -22,7 +22,7 @@ xd0 = initial_conditions_discrete(p_synapse);
 
 ##### Jump problem
 jsave_positions = (false, true);
-jsaveat = 1.0
+jsaveat = 1 / p_synapse.sampling_rate;
 
 # jalgos = (Tsit5(), Tsit5());
 # jalgos = (TRBDF2(), TRBDF2());
@@ -39,11 +39,7 @@ oprob = ODEProblem(
     p,
 );
 xdsol = SavedValues(typeof(t1), typeof(xd0));
-cb = Synapse._SavingCallback(
-    (u, t, integrator) -> integrator.p.xd[:],
-    xdsol;
-    saveat = t1:jsaveat:t2,
-);
+cb = Synapse._SavingCallback((u, t, integrator) -> integrator.p.xd[:], xdsol);
 dep_graph = buildRxDependencyGraph(nu);
 
 # Coevolve
@@ -62,6 +58,8 @@ cosol = @time (
     xcsol = solve(coprob, jalgos[1]; saveat = jsaveat, save_everystep = false),
     xdsol = xdsol,
 );
+
+@test length(cosol.xcsol.t) == length(cosol.xdsol.t)
 
 @info "Integrator" cosol.xcsol.stats
 # with tweaked JumpProcesses.jl
@@ -86,6 +84,8 @@ coresult = @time evolveSynapse(
     saveat = jsaveat,
     save_everystep = false,
 );
+
+@test length(coresult.t) == length(coresult.XD)
 
 # @test sum(coresult.XD[end]) == 278
 
