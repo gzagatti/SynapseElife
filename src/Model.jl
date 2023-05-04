@@ -932,7 +932,11 @@ function SynapseProblem(
     )
     xdsol = SavedValues(typeof(t1), typeof(xd))
     dep_graph = buildRxDependencyGraph(nu)
-    callback = _SavingCallback((u, t, integrator) -> copy(integrator.p.xd), xdsol)
+    callback = _SavingCallback(
+        (u, t, integrator) -> copy(integrator.p.xd),
+        xdsol;
+        save_modified = typeof(save_positions) <: Bool ? save_positions : save_positions[2],
+    )
     jprob = JumpProblem(
         oprob,
         agg,

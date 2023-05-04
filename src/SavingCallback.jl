@@ -75,7 +75,7 @@ function _saving_initialize!(cb, u, t, integrator)
     cb.affect!.save_start && cb.affect!(integrator, true)
 end
 
-function _SavingCallback(save_func, saved_values::SavedValues)
+function _SavingCallback(save_func, saved_values::SavedValues; save_modified = true)
     # adapted from DiffEqCallbacks.jl/src/saving.jl
     saveat_internal =
         DataStructures.BinaryHeap{eltype(saved_values.t)}(DataStructures.FasterForward())
@@ -89,14 +89,18 @@ function _SavingCallback(save_func, saved_values::SavedValues)
         false,
         0,
     )
-    function condition(u, t, integrator)
+    condition = if save_modified
+        function (u, t, integrator)
+            if integrator.u_modified
+                push!(affect!.saveat, t)
+            end
 
-        if integrator.u_modified
-            push!(affect!.saveat, t)
+            return true
         end
-
-        return true
-
+    else
+        function (u, t, integrator)
+            return true
+        end
     end
     DiscreteCallback(
         condition,

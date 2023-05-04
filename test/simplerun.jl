@@ -38,13 +38,13 @@ oprob = ODEProblem(
     (t1, t2),
     p,
 );
-xdsol = SavedValues(typeof(t1), typeof(xd0));
-cb = Synapse._SavingCallback((u, t, integrator) -> integrator.p.xd[:], xdsol);
 dep_graph = buildRxDependencyGraph(nu);
 
 # Coevolve
 coagg = CoevolveSynced();
 
+xdsol = SavedValues(typeof(t1), typeof(xd0));
+cb = Synapse._SavingCallback((u, t, integrator) -> integrator.p.xd[:], xdsol);
 coprob = JumpProblem(
     oprob,
     coagg,
@@ -60,7 +60,6 @@ cosol = @time (
 );
 
 @test length(cosol.xcsol.t) == length(cosol.xdsol.t)
-
 @info "Integrator" cosol.xcsol.stats
 # with tweaked JumpProcesses.jl
 # total_jumps = (coprob.discrete_jump_aggregation.rejections + coprob.discrete_jump_aggregation.jumps);
@@ -86,6 +85,43 @@ coresult = @time evolveSynapse(
 );
 
 @test length(coresult.t) == length(coresult.XD)
+
+# can we run faster, saving less?
+xdsol2 = SavedValues(typeof(t1), typeof(xd0));
+cb2 = Synapse._SavingCallback(
+    (u, t, integrator) -> integrator.p.xd[:],
+    xdsol2;
+    save_modified = false,
+);
+coprob2 = JumpProblem(
+    oprob,
+    coagg,
+    jumps;
+    dep_graph = dep_graph,
+    save_positions = (false, false),
+    callback = cb2,
+);
+cosol2 = @time (xcsol = solve(coprob2, jalgos[1]; save_everystep = false), xdsol = xdsol2);
+
+@test length(cosol2.xcsol.t) == length(cosol2.xdsol.t)
+@info "Integrator" cosol2.xcsol.stats
+
+coresult2 = @time evolveSynapse(
+    xc0,
+    xd0,
+    p_synapse,
+    events_sorted_times,    # external events
+    is_pre_or_post_event,   # pre or post?
+    bap_by_epsp,
+    [true],
+    nu,
+    jalgos,
+    coagg;
+    save_positions = (false, false),
+    save_everystep = false,
+);
+
+@test length(coresult2.t) == length(coresult2.XD)
 
 # @test sum(coresult.XD[end]) == 278
 
