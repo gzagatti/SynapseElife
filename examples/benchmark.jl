@@ -18,8 +18,8 @@ solver = AutoTsit5(Rosenbrock23());
 algorithms = [
     (label = "PDMP", agg = nothing, solver = (CHV(solver), CHV(solver)), saveat = []),
     (
-        label = "CoevolveSynced",
-        agg = CoevolveSynced(),
+        label = "Coevolve",
+        agg = Coevolve(),
         solver = (solver, solver),
         saveat = 1 / p_synapse.sampling_rate,
     ),

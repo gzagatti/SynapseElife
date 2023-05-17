@@ -41,7 +41,7 @@ oprob = ODEProblem(
 dep_graph = buildRxDependencyGraph(nu);
 
 # Coevolve
-coagg = CoevolveSynced();
+coagg = Coevolve();
 
 xdsol = SavedValues(typeof(t1), typeof(xd0));
 cb = Synapse._SavingCallback((u, t, integrator) -> integrator.p.xd[:], xdsol);
@@ -136,7 +136,7 @@ coresult2 = @time evolveSynapse(
 #   sol = (xc = VectorOfArray([xc0]), xd = VectorOfArray([xd0]), t = [0.])
 #   p.xd .= p.xd0
 #   oprob = ODEProblem((du, u, p, t) -> G_synapse(du, u, p.xd, p.p_synapse, t, events_bap, bap_by_epsp), xc0, (t1, t2), p; reltol=1e-7, abstol=1e-9, tstops=tstops);
-#   coagg = CoevolveSynced();
+#   coagg = Coevolve();
 #   coprob = JumpProblem(oprob, coagg, jumps; dep_graph, save_positions = (false, false), reltol=1e-7, abstol=1e-9, tstops=tstops);
 #   integrator = init(coprob, jalgos[1]; save_everystep=false, advance_to_tstop=true)
 
@@ -169,8 +169,8 @@ coresult2 = @time evolveSynapse(
 # 	coagg;
 # 	save_positions = jsave_positions,
 # );
-# ProfileSVG.save("./coevolve-synced-profile.svg",
-# 	title="evolveSynpase CoevolveSynced", maxdepth=110)
+# ProfileSVG.save("./coevolve-profile.svg",
+# 	title="evolveSynpase Coevolve", maxdepth=110)
 # Profile.clear()
 
 
@@ -241,12 +241,12 @@ pdmpresult = @time evolveSynapse(
 ##### Plots
 using Plots
 
-plot(coresult.t, coresult.XD[1, :], label = "CoevolveSynced");
+plot(coresult.t, coresult.XD[1, :], label = "Coevolve");
 # plot!(diresult.t, diresult.XD[1, :], label="Direct")
 plot!(pdmpresult.t, pdmpresult.XD[1, :], label = "PDMP");
 title!("N_ampa")
 
-plot(coresult.t, coresult.XC[1, :], label = "CoevolveSynced");
+plot(coresult.t, coresult.XC[1, :], label = "Coevolve");
 # plot!(diresult.t, diresult.XC[1, :], label="Direct")
 plot!(pdmpresult.t, pdmpresult.XC[1, :], label = "PDMP");
 title!("Vsp")
